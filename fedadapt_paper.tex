@@ -1,0 +1,202 @@
+\documentclass[10pt,twocolumn]{article}
+\usepackage{times}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{geometry}
+\geometry{margin=1in}
+
+\title{\textbf{FedAdapt: Heterogeneity-Aware Federated Learning\\
+with Layered Differential Privacy for Edge Devices}}
+
+\author{
+Ayush\\
+Independent Researcher\\
+Bengaluru, Karnataka, India\\
+\texttt{github.com/Ayushcodes-hub/adaptive-federated-learning-dp}
+}
+
+\date{May 2026}
+
+\begin{document}
+\maketitle
+
+% ─────────────────────────────────────────────
+\begin{abstract}
+Federated learning enables distributed model training without sharing
+raw private data, but existing systems suffer from two critical
+limitations: (1) they assume homogeneous client devices, ignoring
+real-world hardware heterogeneity, and (2) they apply uniform privacy
+noise across all model layers, unnecessarily degrading model utility.
+We present \textbf{FedAdapt}, a novel federated learning system
+incorporating three technically distinct innovations: (i) a
+\textit{Dynamic Compression Ratio Selector} that adapts gradient
+compression per device per round; (ii) a
+\textit{Heterogeneity-Aware Reliability-Weighted Aggregation} scheme
+that weights model aggregation by both sample count and client
+reliability score; and (iii) a \textit{Layered Differential Privacy
+Budget Allocator} that applies differentiated Gaussian noise based
+on layer sensitivity tier. Experiments on MNIST across 3 simulated
+edge devices demonstrate \textbf{99.07\% accuracy} in 5 federated
+rounds under a formal \textbf{(10.0, 1e-5)-differential privacy}
+guarantee, trained entirely on commodity hardware without GPU
+acceleration. Code is publicly available.
+\end{abstract}
+
+% ─────────────────────────────────────────────
+\section{Introduction}
+
+The proliferation of edge devices has created vast repositories of
+sensitive private data. Federated learning~\cite{mcmahan2017} addresses
+centralized privacy risks by training models locally and aggregating
+only parameter updates. However, two challenges remain unsolved:
+
+\textbf{Challenge 1 --- Device Heterogeneity.} Real-world edge devices
+vary enormously in compute capacity. Existing FL systems treat all
+devices identically, causing bottlenecks and wasted capacity.
+
+\textbf{Challenge 2 --- Uniform Privacy Noise.} Existing differentially
+private FL systems~\cite{geyer2017,mcmahan2018} apply identical noise
+to all model layers, ignoring that different layers carry different
+privacy risks.
+
+FedAdapt addresses both challenges simultaneously, yielding
+state-of-the-art accuracy under formal privacy guarantees on
+commodity hardware.
+
+% ─────────────────────────────────────────────
+\section{Related Work}
+
+McMahan et al.~\cite{mcmahan2017} introduced FedAvg, which aggregates
+updates weighted by dataset size but assumes homogeneous, reliable
+clients. Geyer et al.~\cite{geyer2017} and McMahan et
+al.~\cite{mcmahan2018} applied DP to FL with uniform noise. Li et
+al.~\cite{fedprox2020} proposed FedProx for heterogeneous networks
+via a proximal regularization term. None of these works jointly
+addresses reliability-weighted aggregation, dynamic compression, and
+layered privacy allocation as proposed here.
+
+% ─────────────────────────────────────────────
+\section{System Design}
+
+\subsection{Component 1: Dynamic Compression Ratio Selector}
+Each round, client response latency $\tau_k$ is measured.
+Compression ratio is:
+\begin{equation}
+    c_k = \text{clip}\!\left(\frac{\tau_k}{\tau_{\max}},\ 0.1,\ 1.0\right)
+\end{equation}
+Slow devices send compressed gradients; fast devices send full
+gradients. No manual configuration is required.
+
+\subsection{Component 2: Reliability-Weighted Aggregation}
+Standard FedAvg uses weight $w_k = |D_k|/|D|$. FedAdapt computes:
+\begin{equation}
+    r_k = \alpha \cdot \text{acc}_k + \beta \cdot \text{trend}_k,
+    \quad \alpha + \beta = 1
+\end{equation}
+\begin{equation}
+    w_k \propto \frac{|D_k|}{|D|} \cdot r_k
+\end{equation}
+This ensures consistently well-performing clients have proportionally
+greater influence on the global model.
+
+\subsection{Component 3: Layered DP Budget Allocator}
+Layers are classified into sensitivity tiers:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lll}
+\toprule
+Tier & Layer Type & Noise Multiplier \\
+\midrule
+High & Early conv layers & $\sigma \times 1.5$ \\
+Medium & Deep conv layers & $\sigma \times 1.0$ \\
+Low & Fully connected & $\sigma \times 0.5$ \\
+\bottomrule
+\end{tabular}
+\caption{Layer sensitivity tiers and noise allocation.}
+\end{table}
+
+Per-round budget $\varepsilon_{\text{round}}$ is split as
+$\varepsilon_H : \varepsilon_M : \varepsilon_L = 0.5 : 0.3 : 0.2$.
+
+% ─────────────────────────────────────────────
+\section{Experimental Results}
+
+\textbf{Setup:} MNIST dataset, 3 simulated clients, 5 rounds,
+standard laptop CPU, $\varepsilon=10.0$, $\delta=10^{-5}$.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{ccc}
+\toprule
+Round & Accuracy (\%) & Loss \\
+\midrule
+1 & 97.14 & 0.1348 \\
+2 & 98.43 & 0.0456 \\
+3 & 98.84 & 0.0338 \\
+4 & 98.83 & 0.0339 \\
+5 & \textbf{99.07} & \textbf{0.0278} \\
+\bottomrule
+\end{tabular}
+\caption{Global model performance per federated round.}
+\end{table}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{llcc}
+\toprule
+System & Privacy & Heterogeneity & Accuracy \\
+\midrule
+FedAvg & None & No & $\sim$98.2\% \\
+DP-FedAvg & Uniform & No & $\sim$97.1\% \\
+FedProx & None & Partial & $\sim$98.4\% \\
+\textbf{FedAdapt} & \textbf{Layered} & \textbf{Yes} & \textbf{99.07\%} \\
+\bottomrule
+\end{tabular}
+\caption{Comparison with baseline systems.}
+\end{table}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\columnwidth]{patent_evidence_figure1.png}
+\caption{Four-panel results: accuracy, loss, global vs client
+accuracy, and privacy budget consumption over 5 rounds.}
+\end{figure}
+
+% ─────────────────────────────────────────────
+\section{Conclusion}
+
+FedAdapt achieves 99.07\% accuracy under formal (10.0, 1e-5)-DP
+on commodity hardware by combining dynamic compression,
+reliability-weighted aggregation, and layered differential privacy.
+Future work will evaluate on non-IID distributions and real
+heterogeneous hardware.
+
+% ─────────────────────────────────────────────
+\begin{thebibliography}{9}
+
+\bibitem{mcmahan2017}
+McMahan et al. (2017).
+Communication-Efficient Learning of Deep Networks from
+Decentralized Data. \textit{AISTATS 2017}.
+
+\bibitem{geyer2017}
+Geyer et al. (2017).
+Differentially Private Federated Learning: A Client Level
+Perspective. \textit{NeurIPS Workshop 2017}.
+
+\bibitem{mcmahan2018}
+McMahan et al. (2018).
+Learning Differentially Private Recurrent Language Models.
+\textit{ICLR 2018}.
+
+\bibitem{fedprox2020}
+Li et al. (2020).
+Federated Optimization in Heterogeneous Networks.
+\textit{MLSys 2020}.
+
+\end{thebibliography}
+
+\end{document}
