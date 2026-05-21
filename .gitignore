@@ -1,0 +1,5 @@
+fedlearn_env/
+__pycache__/
+*.pyc
+*.pth
+.DS_Store

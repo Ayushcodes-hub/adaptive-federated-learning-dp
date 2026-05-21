@@ -1,0 +1,14 @@
+{
+  "total_budget": 20.0,
+  "total_spent": 10.0,
+  "remaining": 10.0,
+  "num_rounds": 5,
+  "per_round_epsilon": [
+    2.0,
+    2.0,
+    2.0,
+    2.0,
+    2.0
+  ],
+  "privacy_guarantee": "(10.0000, 1e-5)-DP"
+}
